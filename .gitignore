@@ -12,6 +12,9 @@ ENV/
 # Large Model Weights (>100MB)
 *.pt
 
+# Task tracking files
+[tT][aA][sS][kK]*.md
+
 # Flutter / Dart
 mobile_app/.dart_tool/
 mobile_app/.flutter-plugins

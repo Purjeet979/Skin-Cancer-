@@ -1,0 +1,50 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: conference-paper
+authors:
+  - family-names: Saha
+    given-names: Utsha
+  - family-names: Ahamed
+    given-names: Imtiaj Uddin
+  - family-names: Imran
+    given-names: Md Ashique
+  - family-names: Ahamed
+    given-names: Imam Uddin
+  - family-names: Hossain
+    given-names: Al-Amin
+  - family-names: Gupta
+    given-names: Ucchash Das
+title: "YOLOv8-Based Deep Learning Approach for Real-Time Skin Lesion Classification Using the HAM10000 Dataset"
+abstract: >-
+  Skin cancer is a prevalent and potentially fatal disease that requires early
+  detection for effective treatment. We trained and evaluated five YOLOv8
+  classification model variants (YOLOv8n-cls, YOLOv8s-cls, YOLOv8m-cls,
+  YOLOv8l-cls, and YOLOv8x-cls) on the HAM10000 dataset, which contains 10,015
+  dermatoscopic images of common pigmented skin lesions. The models were trained
+  for 30 epochs using data augmentation techniques to enhance generalization.
+  Performance was assessed using metrics including accuracy, precision, recall,
+  F1-score, and inference time. The YOLOv8x-cls model achieved the highest
+  accuracy of 86.2% and precision of 82.1%, while the YOLOv8l-cls model
+  demonstrated the best balance with the highest F1-score of 77.0%. Compared to
+  previous ensemble approaches, our single YOLOv8 models achieved superior
+  performance with lower computational overhead. The YOLOv8n-cls variant showed
+  the fastest inference time of 0.5 ms, making it suitable for real-time
+  applications. Our results demonstrate the potential of YOLOv8-based models for
+  accurate and efficient skin lesion classification, which could aid in early
+  skin cancer detection and improve patient outcomes.
+collection-title: "2024 IEEE International Conference on E-health Networking, Application & Services (HealthCom)"
+year: 2024
+start: 1
+end: 4
+doi: 10.1109/HealthCom60970.2024.10880715
+keywords:
+  - Skin Cancer
+  - YOLOv8-Classification
+  - Skin Lesion Classification
+  - HAM10000 Dataset
+  - Transfer Learning
+  - Deep Learning
+  - Data Augmentation
+  - Inference Time
+  - Convolutional Neural Network
+  - Real-time systems

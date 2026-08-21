@@ -1,0 +1,42 @@
+name: dermascan_ai
+description: DermaScan AI - Offline-First Skin Cancer Screening & Referral Mobile App
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Offline TFLite Inference
+  tflite_flutter: ^0.12.0
+  image: ^4.1.7
+  
+  # Hindi Voice Guidance (TTS)
+  flutter_tts: ^4.2.5
+  
+  # Camera & Storage
+  camera: ^0.10.5+9
+  path_provider: ^2.1.2
+  path: ^1.9.0
+  
+  # Offline Referral Queue & Sync
+  sqflite: ^2.3.2
+  connectivity_plus: ^6.1.0
+  http: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/model/best_int8.tflite
+    - assets/labels.txt

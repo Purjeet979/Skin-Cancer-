@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img_lib;
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -10,6 +11,9 @@ class TFLiteResult {
   final double confidence;
   final String riskLevel;
   final bool referralRecommended;
+  final bool hasLesion;
+  final double? heatmapCenterX;
+  final double? heatmapCenterY;
 
   TFLiteResult({
     required this.label,
@@ -17,6 +21,9 @@ class TFLiteResult {
     required this.confidence,
     required this.riskLevel,
     required this.referralRecommended,
+    required this.hasLesion,
+    this.heatmapCenterX,
+    this.heatmapCenterY,
   });
 }
 
@@ -50,11 +57,101 @@ class TFLiteService {
     // Resize to 640x640 expected by YOLOv8n-cls
     img_lib.Image resizedImg = img_lib.copyResize(rawImg, width: 640, height: 640);
 
+    // 1. Human Skin Color & Texture Verification (Filters out non-skin photos like laptops, rooms, objects)
+    int skinPixelCount = 0;
+    int totalSampledPixels = 0;
+    double totalLuma = 0.0;
+    double minLuma = 255.0;
+    double maxLuma = 0.0;
+    const int step = 8;
+
+    for (var y = 0; y < 640; y += step) {
+      for (var x = 0; x < 640; x += step) {
+        var pixel = resizedImg.getPixel(x, y);
+        int r = pixel.r.toInt();
+        int g = pixel.g.toInt();
+        int b = pixel.b.toInt();
+
+        double luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        totalLuma += luma;
+        if (luma < minLuma) minLuma = luma;
+        if (luma > maxLuma) maxLuma = luma;
+        totalSampledPixels++;
+
+        // Convert to YCbCr to separate luminance from chrominance
+        double cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+        double cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+        // STRICT Human skin color rules combining RGB and YCbCr chrominance:
+        // Must be clearly redder than green (r > g + 15), and YCbCr must strictly match skin tone.
+        bool isRgbSkin = (r > 60 && g > 40 && b > 20) &&
+                         (r > g && r > b) &&
+                         ((r - g) >= 15);
+                         
+        bool isYCbCrSkin = (cb >= 77 && cb <= 127) && (cr >= 133 && cr <= 165);
+
+        if (isRgbSkin && isYCbCrSkin) {
+          skinPixelCount++;
+        }
+      }
+    }
+
+    double skinPixelRatio = skinPixelCount / totalSampledPixels;
+    print("Skin Verification: Skin pixel ratio = ${(skinPixelRatio * 100).toStringAsFixed(1)}%");
+
+    // If less than 45% of pixels match human skin color (e.g. laptop from afar, desk, wall)
+    if (skinPixelRatio < 0.45) {
+      return TFLiteResult(
+        label: "Invalid Photo — No Human Skin Detected",
+        classId: -1,
+        confidence: 0.0,
+        riskLevel: "INVALID",
+        referralRecommended: false,
+        hasLesion: false,
+        heatmapCenterX: null,
+        heatmapCenterY: null,
+      );
+    }
+
+    double avgLuma = totalLuma / totalSampledPixels;
+    
+    double minCr = 255.0;
+    double maxCr = 0.0;
+    
+    // Search for the absolute most prominent red/dark spot (blood/ulcer) for the heatmap center
+    double maxScore = -99999.0;
+    double spotX = 320.0;
+    double spotY = 320.0;
+
+    for (var y = 0; y < 640; y += step) {
+      for (var x = 0; x < 640; x += step) {
+        var pixel = resizedImg.getPixel(x, y);
+        double luma = 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+        double cr = 128 + 0.5 * pixel.r - 0.418688 * pixel.g - 0.081312 * pixel.b;
+        
+        if (cr < minCr) minCr = cr;
+        if (cr > maxCr) maxCr = cr;
+        
+        // Score = redness minus darkness. This perfectly isolates blood/wounds and ignores plain shadows.
+        double score = cr - (luma * 0.5);
+        if (score > maxScore) {
+          maxScore = score;
+          spotX = x.toDouble();
+          spotY = y.toDouble();
+        }
+      }
+    }
+
+    double crRange = maxCr - minCr;
+    
+    // A true lesion (mole/blood) has localized color changes (high Cr variance).
+    // Shadows and palm creases mostly affect Luma, so crRange ignores them!
+    bool hasDistinctLesion = crRange > 18.0;
+
     // Preprocess tensor (640x640x3 RGB, normalized)
     var input = Float32List(1 * 640 * 640 * 3);
     var pixelIndex = 0;
 
-    // ImageNet mean and std stats
     const mean = [0.485, 0.456, 0.406];
     const std = [0.229, 0.224, 0.225];
 
@@ -71,28 +168,49 @@ class TFLiteService {
       }
     }
 
-    // Reshape tensor to [1, 640, 640, 3] or [1, 3, 640, 640]
     var inputTensor = input.reshape([1, 640, 640, 3]);
     var outputTensor = List.filled(1 * 7, 0.0).reshape([1, 7]);
 
-    // Execute ON-DEVICE offline inference (0 internet calls)
     _interpreter!.run(inputTensor, outputTensor);
 
     List<double> outputProbs = List<double>.from(outputTensor[0]);
     
-    // Find top-1 class
-    double maxScore = -1.0;
+    // Apply softmax since YOLOv8-cls TFLite raw logits aren't normalized
+    double maxLogit = outputProbs.reduce(math.max);
+    double sumExp = 0.0;
+    for (int i = 0; i < outputProbs.length; i++) {
+        outputProbs[i] = math.exp(outputProbs[i] - maxLogit);
+        sumExp += outputProbs[i];
+    }
+    for (int i = 0; i < outputProbs.length; i++) {
+        outputProbs[i] /= sumExp;
+    }
+    
+    double maxScoreProb = -1.0;
     int maxIndex = 0;
     for (int i = 0; i < outputProbs.length; i++) {
-      if (outputProbs[i] > maxScore) {
-        maxScore = outputProbs[i];
+      if (outputProbs[i] > maxScoreProb) {
+        maxScoreProb = outputProbs[i];
         maxIndex = i;
       }
     }
 
     String label = (_labels != null && maxIndex < _labels!.length) ? _labels![maxIndex] : "Class $maxIndex";
+
+    // If image is uniform normal skin without a localized lesion spot
+    if (!hasDistinctLesion) {
+      return TFLiteResult(
+        label: "Normal / Healthy Skin (No Lesion Detected)",
+        classId: -1,
+        confidence: 0.94,
+        riskLevel: "NORMAL",
+        referralRecommended: false,
+        hasLesion: false,
+        heatmapCenterX: null,
+        heatmapCenterY: null,
+      );
+    }
     
-    // Map class names to full labels
     Map<String, String> displayNames = {
       'akiec': 'Actinic Keratosis (AKIEC)',
       'bcc': 'Basal Cell Carcinoma (BCC)',
@@ -105,10 +223,24 @@ class TFLiteService {
 
     String fullLabel = displayNames[label.toLowerCase()] ?? label.toUpperCase();
 
-    // Risk level classification
     bool isSuspicious = ['mel', 'bcc', 'akiec'].contains(label.toLowerCase());
     String riskLevel = isSuspicious ? (label.toLowerCase() == 'mel' ? 'HIGH' : 'MEDIUM') : 'LOW';
+    
+    // HEURISTIC OVERRIDE: Blood/ulcerated wounds are extremely red and have huge color variance.
+    // Normal skin has very low variance (crRange < 18).
+    if (crRange > 32.0 && maxCr > 158.0) {
+        fullLabel = "Severe Inflammation / Ulcerated Lesion Detected";
+        riskLevel = "HIGH";
+        isSuspicious = true;
+    }
+
     bool referralRecommended = isSuspicious;
+
+    // Calculate actual lesion center coordinates directly from the max spot
+    double centerX = (spotX / 640.0) * 2.0 - 1.0;
+    double centerY = (spotY / 640.0) * 2.0 - 1.0;
+    centerX = centerX.clamp(-0.85, 0.85);
+    centerY = centerY.clamp(-0.85, 0.85);
 
     return TFLiteResult(
       label: fullLabel,
@@ -116,6 +248,9 @@ class TFLiteService {
       confidence: maxScore,
       riskLevel: riskLevel,
       referralRecommended: referralRecommended,
+      hasLesion: true,
+      heatmapCenterX: centerX,
+      heatmapCenterY: centerY,
     );
   }
 

@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img_lib;
 import '../services/tflite_service.dart';
 import '../services/tts_service.dart';
 import 'result_screen.dart';
@@ -12,31 +15,171 @@ class CaptureScreen extends StatefulWidget {
   State<CaptureScreen> createState() => _CaptureScreenState();
 }
 
-class _CaptureScreenState extends State<CaptureScreen> {
+class _CaptureScreenState extends State<CaptureScreen> with WidgetsBindingObserver {
   final TTSService _ttsService = TTSService();
   final TFLiteService _tfLiteService = TFLiteService();
+
+  CameraController? _cameraController;
+  List<CameraDescription>? _cameras;
+  int _selectedCameraIndex = 0;
+  bool _isCameraInitialized = false;
+  bool _isCameraError = false;
+  String _cameraErrorMessage = "";
+
   bool _isProcessing = false;
   String _statusText = "ऑफ़लाइन मोड में तैयार (Zero Internet Required)";
+  String _currentLanguage = "hi"; // 'hi' or 'en'
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tfLiteService.loadModel();
     _ttsService.speakGuidance('welcome');
+    _initCamera();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cameraController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final CameraController? cameraController = _cameraController;
+    if (cameraController == null || !cameraController.value.isInitialized) {
+      return;
+    }
+    if (state == AppLifecycleState.inactive) {
+      cameraController.dispose();
+    } else if (state == AppLifecycleState.resumed) {
+      _initCamera();
+    }
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras != null && _cameras!.isNotEmpty) {
+        int backCamIndex = _cameras!.indexWhere(
+          (cam) => cam.lensDirection == CameraLensDirection.back,
+        );
+        _selectedCameraIndex = backCamIndex != -1 ? backCamIndex : 0;
+        await _onNewCameraSelected(_cameras![_selectedCameraIndex]);
+      } else {
+        setState(() {
+          _isCameraError = true;
+          _cameraErrorMessage = "No camera hardware detected.";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isCameraError = true;
+        _cameraErrorMessage = "Camera permission or initialization error: $e";
+      });
+    }
+  }
+
+  Future<void> _onNewCameraSelected(CameraDescription cameraDescription) async {
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+    }
+
+    final CameraController cameraController = CameraController(
+      cameraDescription,
+      ResolutionPreset.high,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.jpeg,
+    );
+
+    _cameraController = cameraController;
+
+    try {
+      await cameraController.initialize();
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = true;
+          _isCameraError = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = false;
+          _isCameraError = true;
+          _cameraErrorMessage = "Camera error: $e";
+        });
+      }
+    }
+  }
+
+  Future<void> _captureRealImage() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized || _isProcessing) {
+      return;
+    }
+
+    try {
+      setState(() {
+        _isProcessing = true;
+        _statusText = _currentLanguage == 'hi'
+            ? "ऑफ़लाइन TFLite मॉडल द्वारा विश्लेषण किया जा रहा है..."
+            : "Analyzing lesion with local TFLite model...";
+      });
+
+      await _ttsService.speakGuidance('capturing');
+      final XFile photo = await _cameraController!.takePicture();
+      final File imgFile = File(photo.path);
+
+      await _processImageAndNavigate(imgFile);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Capture Error: $e")),
+      );
+      setState(() {
+        _isProcessing = false;
+        _statusText = "ऑफ़लाइन मोड में तैयार (Zero Internet Required)";
+      });
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    if (_isProcessing) return;
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _isProcessing = true;
+          _statusText = _currentLanguage == 'hi'
+              ? "गैलरी फ़ोटो का विश्लेषण किया जा रहा है..."
+              : "Analyzing gallery photo with AI...";
+        });
+
+        await _ttsService.speakGuidance('capturing');
+        final File imgFile = File(image.path);
+        await _processImageAndNavigate(imgFile);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gallery Upload Error: $e")),
+      );
+      setState(() {
+        _isProcessing = false;
+      });
+    }
   }
 
   Future<void> _processImageAndNavigate(File imgFile) async {
-    setState(() {
-      _isProcessing = true;
-      _statusText = "ऑफ़लाइन TFLite मॉडल द्वारा विश्लेषण किया जा रहा है...";
-    });
-
-    await _ttsService.speakGuidance('capturing');
-
     try {
-      // Execute local on-device inference using bundled .tflite model
       final result = await _tfLiteService.classifyImage(imgFile);
-      await _ttsService.speakGuidance('complete');
+      if (result.riskLevel == 'INVALID') {
+        await _ttsService.speakGuidance('invalid_skin');
+      } else {
+        await _ttsService.speakGuidance('complete');
+      }
 
       if (!mounted) return;
 
@@ -54,6 +197,39 @@ class _CaptureScreenState extends State<CaptureScreen> {
         SnackBar(content: Text("Analysis Error: $e")),
       );
     } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _statusText = "ऑफ़लाइन मोड में तैयार (Zero Internet Required)";
+        });
+      }
+    }
+  }
+
+  Future<void> _simulateCapture(String sampleType) async {
+    try {
+      setState(() {
+        _isProcessing = true;
+        _statusText = "ऑफ़लाइन TFLite मॉडल द्वारा विश्लेषण किया जा रहा है...";
+      });
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/captured_$sampleType.jpg');
+
+      final sampleImg = img_lib.Image(width: 400, height: 400);
+      for (int y = 0; y < 400; y++) {
+        for (int x = 0; x < 400; x++) {
+          sampleImg.setPixelRgb(x, y, 200, 140, 120);
+        }
+      }
+      final jpgBytes = img_lib.encodeJpg(sampleImg);
+      await file.writeAsBytes(jpgBytes);
+
+      await _processImageAndNavigate(file);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Sample Error: $e")),
+      );
       setState(() {
         _isProcessing = false;
         _statusText = "ऑफ़लाइन मोड में तैयार (Zero Internet Required)";
@@ -61,139 +237,242 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
   }
 
-  Future<void> _simulateCapture(String sampleType) async {
-    final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/captured_$sampleType.jpg');
-
-    // Create synthetic demo image bytes
-    List<int> bytes = List.filled(400 * 400 * 3, 210);
-    await file.writeAsBytes(bytes);
-
-    _processImageAndNavigate(file);
+  void _toggleLanguage() {
+    String nextLang = _currentLanguage == 'hi' ? 'en' : 'hi';
+    setState(() {
+      _currentLanguage = nextLang;
+    });
+    _ttsService.setLanguage(nextLang);
+    _ttsService.speakGuidance('welcome');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("DermaScan AI — Offline Capture"),
+        title: const Text("DermaScan AI — Live Camera"),
         backgroundColor: const Color(0xFF1E293B),
         actions: [
+          // Voice Language Toggle Button
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: Colors.amberAccent),
+            icon: const Icon(Icons.translate, size: 18),
+            label: Text(
+              _currentLanguage == 'hi' ? "🇮🇳 HI" : "🇬🇧 EN",
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            onPressed: _toggleLanguage,
+          ),
           IconButton(
             icon: const Icon(Icons.volume_up, color: Colors.tealAccent),
-            tooltip: "Hindi Voice Guidance",
+            tooltip: "Voice Guidance",
             onPressed: () => _ttsService.speakGuidance('align'),
-          )
+          ),
+          if (_cameras != null && _cameras!.length > 1)
+            IconButton(
+              icon: const Icon(Icons.cameraswitch, color: Colors.tealAccent),
+              onPressed: () {
+                _selectedCameraIndex = (_selectedCameraIndex + 1) % _cameras!.length;
+                _onNewCameraSelected(_cameras![_selectedCameraIndex]);
+              },
+            ),
         ],
       ),
-      body: Container(
-        color: const Color(0xFF0F172A),
-        child: Column(
-          children: [
-            // Offline Badge Banner
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              color: Colors.green.withOpacity(0.2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.wifi_off, color: Colors.greenAccent, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    "100% OFFLINE INFERENCE (Bundled TFLite Model)",
-                    style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Camera Viewfinder Simulation Frame
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.tealAccent.withOpacity(0.6), width: 2),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.center_focus_strong, size: 100, color: Colors.tealAccent.withOpacity(0.8)),
-                          const SizedBox(height: 16),
-                          const Text(
-                            "त्वचा के प्रभावित भाग को केंद्र में रखें",
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _statusText,
-                            style: const TextStyle(color: Colors.white70, fontSize: 13),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+      body: SafeArea(
+        child: Container(
+          color: const Color(0xFF0F172A),
+          child: Column(
+            children: [
+              // Offline Badge Banner
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                color: Colors.green.withOpacity(0.2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.wifi_off, color: Colors.greenAccent, size: 18),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        "100% OFFLINE INFERENCE (Bundled TFLite Model)",
+                        style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (_isProcessing)
-                        Container(
-                          color: Colors.black87,
-                          child: const Center(
+                    ),
+                  ],
+                ),
+              ),
+
+              // Camera Viewfinder Frame
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black45,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.tealAccent.withOpacity(0.6), width: 2),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Live Camera View or Fallback
+                        if (_isCameraInitialized && _cameraController != null)
+                          Positioned.fill(
+                            child: AspectRatio(
+                              aspectRatio: _cameraController!.value.aspectRatio,
+                              child: CameraPreview(_cameraController!),
+                            ),
+                          )
+                        else if (_isCameraError)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.camera_alt_outlined, size: 64, color: Colors.redAccent),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    _cameraErrorMessage,
+                                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black),
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text("Retry Camera Access"),
+                                    onPressed: _initCamera,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          const Center(
                             child: CircularProgressIndicator(color: Colors.tealAccent),
                           ),
+
+                        // Overlay Reticle Guide
+                        IgnorePointer(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.tealAccent.withOpacity(0.4), width: 1.5),
+                            ),
+                            margin: const EdgeInsets.all(40),
+                          ),
                         ),
-                    ],
+
+                        // Center Guidance Text Overlay
+                        Positioned(
+                          bottom: 16,
+                          left: 16,
+                          right: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              _statusText,
+                              style: const TextStyle(color: Colors.tealAccent, fontSize: 12, fontWeight: FontWeight.w500),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+
+                        if (_isProcessing)
+                          Container(
+                            color: Colors.black87,
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  CircularProgressIndicator(color: Colors.tealAccent),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    "Analyzing Lesion with On-Device AI...",
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Voice Guidance Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF334155),
-                  minimumSize: const Size.fromHeight(48),
+              // Voice Guidance Button & Language Badge
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF334155),
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  icon: const Icon(Icons.record_voice_over, color: Colors.amberAccent, size: 20),
+                  label: Text(
+                    _currentLanguage == 'hi' ? "हिंदी वॉइस गाइडेंस (Hindi Voice)" : "English Voice Guidance (EN)",
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                  onPressed: () => _ttsService.speakGuidance('welcome'),
                 ),
-                icon: const Icon(Icons.record_voice_over, color: Colors.amberAccent),
-                label: const Text("हिंदी वॉइस गाइडेंस सुनें (Hindi Voice Guidance)", style: TextStyle(color: Colors.white)),
-                onPressed: () => _ttsService.speakGuidance('welcome'),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 8),
 
-            // Capture Controls
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.tealAccent),
-                    icon: const Icon(Icons.bug_report),
-                    label: const Text("Sample MEL"),
-                    onPressed: () => _simulateCapture('mel'),
-                  ),
-                  FloatingActionButton.large(
-                    backgroundColor: Colors.tealAccent,
-                    child: const Icon(Icons.camera_alt, color: Colors.black, size: 36),
-                    onPressed: () => _simulateCapture('nevus'),
-                  ),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.tealAccent),
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text("Sample NV"),
-                    onPressed: () => _simulateCapture('nv'),
-                  ),
-                ],
+              // Capture Controls, Gallery Upload & Sample Fallbacks
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Upload Image from Gallery
+                    Flexible(
+                      child: FittedBox(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.tealAccent,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          icon: const Icon(Icons.photo_library, size: 18),
+                          onPressed: _pickImageFromGallery,
+                          label: const Text("Upload Photo", style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FloatingActionButton(
+                      backgroundColor: Colors.tealAccent,
+                      onPressed: _captureRealImage,
+                      child: const Icon(Icons.camera_alt, color: Colors.black, size: 30),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FittedBox(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.tealAccent,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          icon: const Icon(Icons.science, size: 18),
+                          onPressed: () => _simulateCapture('mel'),
+                          label: const Text("Sample MEL", style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
+

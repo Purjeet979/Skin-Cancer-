@@ -82,8 +82,9 @@ class TFLiteService {
         double cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
         double cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
-        // STRICT Human skin color rules combining RGB and YCbCr chrominance:
-        // Must be clearly redder than green (r > g + 15), and YCbCr must strictly match skin tone.
+        // STRICT Human skin color rules (blocks wood, laptops, warm lights)
+        // Lesions (blood/scabs) will fail this pixel test, but that's okay!
+        // We only need the healthy skin around the lesion to pass.
         bool isRgbSkin = (r > 60 && g > 40 && b > 20) &&
                          (r > g && r > b) &&
                          ((r - g) >= 15);
@@ -99,8 +100,10 @@ class TFLiteService {
     double skinPixelRatio = skinPixelCount / totalSampledPixels;
     print("Skin Verification: Skin pixel ratio = ${(skinPixelRatio * 100).toStringAsFixed(1)}%");
 
-    // If less than 45% of pixels match human skin color (e.g. laptop from afar, desk, wall)
-    if (skinPixelRatio < 0.45) {
+    // We only need 10% of the image to be HEALTHY skin.
+    // This allows extreme close-ups of giant lesions (where 90% is ulcer/scab),
+    // while still perfectly blocking laptops/walls which have 0% human skin.
+    if (skinPixelRatio < 0.10) {
       return TFLiteResult(
         label: "Invalid Photo — No Human Skin Detected",
         classId: -1,

@@ -12,18 +12,27 @@
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+**🔗 Live Site:** [dermascans.netlify.app](https://dermascans.netlify.app/)
+
 </div>
 
 ---
 
 ## 📑 Table of Contents
 
+- [Live Demo](#-live-demo)
 - [Key Features](#-key-features)
 - [Repository Structure](#-repository-structure)
 - [Model Performance & Quantization](#-model-performance--quantization)
 - [Quick Start Guide](#-quick-start-guide)
 - [Running Automated Tests](#-running-automated-tests)
 - [Citation & Acknowledgments](#-citation--acknowledgments)
+
+---
+
+## 🌐 Live Demo
+
+**Web Landing Page:** [https://dermascans.netlify.app/](https://dermascans.netlify.app/) — download the production APK directly from here.
 
 ---
 

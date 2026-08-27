@@ -143,7 +143,7 @@ flutter test
 
 ## 📄 Citation & Acknowledgments
 
-- **Dataset:** HAM10000 Dataset / ISIC 2018 Challenge
+- **Dataset:** HAM10000 Dataset 
 - **Frameworks:** Flutter, TensorFlow Lite, PyTorch, FastAPI, SQLite
 
 ---

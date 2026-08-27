@@ -32,6 +32,8 @@ dependencies:
 
   # Real Location & GPS
   geolocator: ^10.1.0
+  shared_preferences: ^2.5.5
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -44,3 +46,9 @@ flutter:
   assets:
     - assets/model/best_int8.tflite
     - assets/labels.txt
+    - assets/logo.png
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/logo.png"

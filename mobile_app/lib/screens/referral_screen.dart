@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/offline_queue_service.dart';
 
 class ReferralScreen extends StatefulWidget {
@@ -20,8 +22,8 @@ class ReferralScreen extends StatefulWidget {
 
 class _ReferralScreenState extends State<ReferralScreen> {
   final OfflineQueueService _queueService = OfflineQueueService();
-  final _nameController = TextEditingController(text: "Rahul Sharma (Patient)");
-  final _contactController = TextEditingController(text: "+91 98765 43210");
+  final _nameController = TextEditingController();
+  final _contactController = TextEditingController();
 
   bool _isOnline = false;
   bool _isLoadingLocation = false;
@@ -36,7 +38,16 @@ class _ReferralScreenState extends State<ReferralScreen> {
   @override
   void initState() {
     super.initState();
+    _loadPatientInfo();
     _checkConnectivityAndFetchLocation();
+  }
+
+  Future<void> _loadPatientInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _nameController.text = prefs.getString('patient_name') ?? "Patient Name";
+      _contactController.text = prefs.getString('patient_contact') ?? "Contact Number";
+    });
   }
 
   Future<void> _checkConnectivityAndFetchLocation() async {
@@ -157,6 +168,8 @@ class _ReferralScreenState extends State<ReferralScreen> {
             "clinic": address,
             "address": address,
             "phone": phone,
+            "lat": pLat,
+            "lon": pLon,
             "distance_val": distKm,
             "distance_km": "${distKm.toStringAsFixed(1)} km",
             "rating": "4.8 ★",
@@ -193,7 +206,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
           "name": "Dr. Sarah Lin, MD",
           "specialty": "Dermato-Oncology Specialist",
           "clinic": "Skin & Cancer Specialty Center",
-          "phone": "+91 98110 12345",
+          "phone": "+919811012345",
           "distance_km": "1.2 km",
           "rating": "4.9 ★",
           "is_real": false,
@@ -203,7 +216,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
           "name": "Dr. Marcus Vance, MD",
           "specialty": "Mohs Surgery & Skin Lesion Specialist",
           "clinic": "City Skin Institute",
-          "phone": "+91 98220 54321",
+          "phone": "+919822054321",
           "distance_km": "2.4 km",
           "rating": "4.8 ★",
           "is_real": false,
@@ -213,7 +226,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
           "name": "Dr. Elena Rostova, MD",
           "specialty": "General Dermatology",
           "clinic": "Bayview Medical Center",
-          "phone": "+91 98330 98765",
+          "phone": "+919833098765",
           "distance_km": "3.8 km",
           "rating": "4.7 ★",
           "is_real": false,
@@ -221,6 +234,21 @@ class _ReferralScreenState extends State<ReferralScreen> {
       ];
       _selectedDoctorId = 1;
     });
+  }
+
+  Future<void> _launchDirections(Map<String, dynamic> doc) async {
+    String url = '';
+    if (doc["is_real"] == true) {
+      // Use lat/lon for real places
+      url = "https://www.google.com/maps/dir/?api=1&destination=${doc['lat']},${doc['lon']}";
+    } else {
+      // Use text search for mock places
+      url = "https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(doc['clinic'] + ' ' + doc['name'])}";
+    }
+    
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
   }
 
   Future<void> _submitReferral() async {
@@ -243,35 +271,45 @@ class _ReferralScreenState extends State<ReferralScreen> {
     });
 
     if (mounted) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          title: Row(
-            children: [
-              Icon(
-                res['synced'] ? Icons.cloud_done : Icons.wifi_off,
-                color: res['synced'] ? Colors.greenAccent : Colors.orangeAccent,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                res['synced'] ? "Booking Confirmed Online" : "Queued Offline",
-                style: const TextStyle(color: Colors.white, fontSize: 18),
-              ),
+      if (_isOnline) {
+        // Dial phone number
+        final selectedDoc = _doctors.firstWhere((d) => d["id"] == _selectedDoctorId);
+        final phone = selectedDoc["phone"].replaceAll(RegExp(r'[^\d+]'), '');
+        final telUrl = Uri.parse("tel:$phone");
+        if (await canLaunchUrl(telUrl)) {
+          await launchUrl(telUrl);
+        }
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            title: Row(
+              children: [
+                Icon(
+                  res['synced'] ? Icons.cloud_done : Icons.wifi_off,
+                  color: res['synced'] ? Colors.greenAccent : Colors.orangeAccent,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  res['synced'] ? "Booking Confirmed Online" : "Queued Offline",
+                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                ),
+              ],
+            ),
+            content: Text(
+              res['message'],
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                child: const Text("OK", style: TextStyle(color: Colors.tealAccent)),
+                onPressed: () => Navigator.pop(context),
+              )
             ],
           ),
-          content: Text(
-            res['message'],
-            style: const TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              child: const Text("OK", style: TextStyle(color: Colors.tealAccent)),
-              onPressed: () => Navigator.pop(context),
-            )
-          ],
-        ),
-      );
+        );
+      }
     }
   }
 
@@ -389,7 +427,28 @@ class _ReferralScreenState extends State<ReferralScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(doc["distance_km"], style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold)),
-                          Text(doc["rating"], style: const TextStyle(color: Colors.amberAccent, fontSize: 12)),
+                          const SizedBox(height: 4),
+                          if (isSelected)
+                            InkWell(
+                              onTap: () => _launchDirections(doc),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.tealAccent.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.directions, color: Colors.tealAccent, size: 14),
+                                    SizedBox(width: 4),
+                                    Text("Map", style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            Text(doc["rating"], style: const TextStyle(color: Colors.amberAccent, fontSize: 12)),
                         ],
                       ),
                       onTap: () {

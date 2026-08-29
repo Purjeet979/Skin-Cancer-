@@ -28,12 +28,26 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   Future<void> _startScan() async {
+    if (_nameController.text.trim().isEmpty || _contactController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter both name and contact details (नाम और मोबाइल नंबर दर्ज करें).'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     // Save to shared_preferences so it doesn't ask again next time
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('patient_name', _nameController.text);
     await prefs.setString('patient_contact', _contactController.text);
 
     if (!mounted) return;
+    
+    // Dismiss keyboard before navigating
+    FocusScope.of(context).unfocus();
+    
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const CaptureScreen()),

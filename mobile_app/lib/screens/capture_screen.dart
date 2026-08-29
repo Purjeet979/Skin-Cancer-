@@ -27,7 +27,7 @@ class _CaptureScreenState extends State<CaptureScreen> with WidgetsBindingObserv
   String _cameraErrorMessage = "";
 
   bool _isProcessing = false;
-  String _statusText = "ऑफ़लाइन मोड में तैयार (Zero Internet Required)";
+  String _statusText = "कैमरा तैयार है (Camera is Ready)";
   String _currentLanguage = "hi"; // 'hi' or 'en'
 
   @override
@@ -124,8 +124,8 @@ class _CaptureScreenState extends State<CaptureScreen> with WidgetsBindingObserv
       setState(() {
         _isProcessing = true;
         _statusText = _currentLanguage == 'hi'
-            ? "ऑफ़लाइन TFLite मॉडल द्वारा विश्लेषण किया जा रहा है..."
-            : "Analyzing lesion with local TFLite model...";
+            ? "फ़ोटो की जाँच हो रही है..."
+            : "Analyzing photo...";
       });
 
       await _ttsService.speakGuidance('capturing');
@@ -139,7 +139,7 @@ class _CaptureScreenState extends State<CaptureScreen> with WidgetsBindingObserv
       );
       setState(() {
         _isProcessing = false;
-        _statusText = "ऑफ़लाइन मोड में तैयार (Zero Internet Required)";
+        _statusText = "कैमरा तैयार है (Camera is Ready)";
       });
     }
   }
@@ -154,8 +154,8 @@ class _CaptureScreenState extends State<CaptureScreen> with WidgetsBindingObserv
         setState(() {
           _isProcessing = true;
           _statusText = _currentLanguage == 'hi'
-              ? "गैलरी फ़ोटो का विश्लेषण किया जा रहा है..."
-              : "Analyzing gallery photo with AI...";
+              ? "गैलरी फ़ोटो की जाँच हो रही है..."
+              : "Analyzing gallery photo...";
         });
 
         await _ttsService.speakGuidance('capturing');
@@ -207,6 +207,7 @@ class _CaptureScreenState extends State<CaptureScreen> with WidgetsBindingObserv
   }
 
   Future<void> _simulateCapture(String sampleType) async {
+    if (_isProcessing) return;
     try {
       setState(() {
         _isProcessing = true;
@@ -283,25 +284,8 @@ class _CaptureScreenState extends State<CaptureScreen> with WidgetsBindingObserv
           color: const Color(0xFF0F172A),
           child: Column(
             children: [
-              // Offline Badge Banner
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                color: Colors.green.withOpacity(0.2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.wifi_off, color: Colors.greenAccent, size: 18),
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        "100% OFFLINE INFERENCE (Bundled TFLite Model)",
-                        style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 12),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // Empty space to replace the form
+              const SizedBox(height: 8),
 
               // Camera Viewfinder Frame
               Expanded(

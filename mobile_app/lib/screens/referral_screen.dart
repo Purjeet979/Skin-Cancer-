@@ -246,12 +246,28 @@ class _ReferralScreenState extends State<ReferralScreen> {
       url = "https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(doc['clinic'] + ' ' + doc['name'])}";
     }
     
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Google Maps not installed or unavailable.")));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error opening Maps: $e")));
     }
   }
 
   Future<void> _submitReferral() async {
+    if (_nameController.text.trim().isEmpty || _contactController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please fill in patient name and contact details."),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -273,11 +289,17 @@ class _ReferralScreenState extends State<ReferralScreen> {
     if (mounted) {
       if (_isOnline) {
         // Dial phone number
-        final selectedDoc = _doctors.firstWhere((d) => d["id"] == _selectedDoctorId);
-        final phone = selectedDoc["phone"].replaceAll(RegExp(r'[^\d+]'), '');
-        final telUrl = Uri.parse("tel:$phone");
-        if (await canLaunchUrl(telUrl)) {
-          await launchUrl(telUrl);
+        try {
+          final selectedDoc = _doctors.firstWhere((d) => d["id"] == _selectedDoctorId);
+          final phone = selectedDoc["phone"].replaceAll(RegExp(r'[^\d+]'), '');
+          final telUrl = Uri.parse("tel:$phone");
+          if (await canLaunchUrl(telUrl)) {
+            await launchUrl(telUrl);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Phone dialer not available.")));
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error opening dialer: $e")));
         }
       } else {
         showDialog(

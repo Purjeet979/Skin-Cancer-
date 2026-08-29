@@ -19,7 +19,6 @@ class ResultScreen extends StatefulWidget {
 }
 
 class _ResultScreenState extends State<ResultScreen> {
-  bool _showGradCam = true;
   bool _isOnline = false;
 
   @override
@@ -74,28 +73,6 @@ class _ResultScreenState extends State<ResultScreen> {
                             fit: BoxFit.cover,
                           ),
                         ),
-                        if (_showGradCam && widget.result.hasLesion && widget.result.heatmapCenterX != null)
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                gradient: RadialGradient(
-                                  colors: [
-                                    Colors.red.withOpacity(0.60),
-                                    Colors.yellow.withOpacity(0.35),
-                                    Colors.blue.withOpacity(0.1),
-                                    Colors.transparent,
-                                  ],
-                                  stops: const [0.0, 0.35, 0.65, 1.0],
-                                  center: Alignment(
-                                    widget.result.heatmapCenterX!,
-                                    widget.result.heatmapCenterY!,
-                                  ),
-                                  radius: 0.55,
-                                ),
-                              ),
-                            ),
-                          ),
                         Positioned(
                           top: 12,
                           right: 12,
@@ -128,40 +105,30 @@ class _ResultScreenState extends State<ResultScreen> {
                         ),
                       ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                widget.result.hasLesion ? Icons.remove_red_eye : Icons.check_circle_outline,
-                                color: widget.result.hasLesion ? Colors.tealAccent : Colors.greenAccent,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                widget.result.hasLesion
-                                    ? (_showGradCam ? "Grad-CAM Heatmap Layer: ON" : "Original Lesion View")
-                                    : (widget.result.riskLevel == 'INVALID' ? "Invalid Image — Non-Skin Photo" : "Normal Healthy Skin (No Heatmap Required)"),
+                    if (widget.result.riskLevel == 'INVALID' || !widget.result.hasLesion)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(
+                              widget.result.riskLevel == 'INVALID' ? Icons.error_outline : Icons.check_circle_outline,
+                              color: widget.result.riskLevel == 'INVALID' ? Colors.redAccent : Colors.greenAccent,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.result.riskLevel == 'INVALID' ? "Invalid Image — Non-Skin Photo" : "Normal Healthy Skin (No Lesion Detected)",
                                 style: TextStyle(
-                                  color: widget.result.hasLesion ? Colors.white70 : (widget.result.riskLevel == 'INVALID' ? Colors.redAccent : Colors.greenAccent),
+                                  color: widget.result.riskLevel == 'INVALID' ? Colors.redAccent : Colors.greenAccent,
                                   fontSize: 13,
-                                  fontWeight: widget.result.hasLesion ? FontWeight.normal : FontWeight.bold,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ],
-                          ),
-                          if (widget.result.hasLesion)
-                            Switch(
-                              value: _showGradCam,
-                              activeColor: Colors.tealAccent,
-                              onChanged: (val) => setState(() => _showGradCam = val),
                             ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -250,6 +217,19 @@ class _ResultScreenState extends State<ResultScreen> {
                                 : "✅ Low Risk / Normal: Routine monitoring recommended. Consult a physician if changes occur."),
                         style: const TextStyle(color: Colors.white70, fontSize: 14),
                       ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blueGrey.withOpacity(0.3)),
+                        ),
+                        child: const Text(
+                          "Disclaimer: This tool screens for 7 specific skin lesion types from the HAM10000 dataset. It is not designed to assess open wounds, burns, or active bleeding — please consult a doctor directly for those.",
+                          style: TextStyle(color: Colors.white54, fontSize: 11, fontStyle: FontStyle.italic),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -281,6 +261,14 @@ class _ResultScreenState extends State<ResultScreen> {
                   );
                 },
               ),
+              const SizedBox(height: 24),
+              const Center(
+                child: Text(
+                  "Build Version: v1.0.2",
+                  style: TextStyle(color: Colors.white30, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 12),
             ],
           ),
         ),

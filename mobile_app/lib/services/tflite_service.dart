@@ -100,10 +100,11 @@ class TFLiteService {
     double skinPixelRatio = skinPixelCount / totalSampledPixels;
     print("Skin Verification: Skin pixel ratio = ${(skinPixelRatio * 100).toStringAsFixed(1)}%");
 
-    // We only need 10% of the image to be HEALTHY skin.
-    // This allows extreme close-ups of giant lesions (where 90% is ulcer/scab),
-    // while still perfectly blocking laptops/walls which have 0% human skin.
-    if (skinPixelRatio < 0.10) {
+    // We require 25% of the image to be HEALTHY skin (increased from 10%).
+    // This allows extreme close-ups of giant lesions (where 75% is ulcer/scab),
+    // while effectively blocking laptops, walls, and wooden desks that might accidentally
+    // pass the color math due to warm lighting or small background skin patches.
+    if (skinPixelRatio < 0.25) {
       return TFLiteResult(
         label: "Invalid Photo — No Human Skin Detected",
         classId: -1,

@@ -88,9 +88,9 @@ class TFLiteService {
     double skinPixelRatio = skinPixelCount / totalSampledPixels;
     print("Skin Verification: Skin pixel ratio = ${(skinPixelRatio * 100).toStringAsFixed(1)}%");
 
-    // Final robust threshold: We require 50% of the image to be healthy, well-lit human skin.
+    // Final robust threshold: We require 35% of the image to be healthy, well-lit human skin.
     // Luma bounds (40-240) actively reject shadows and warm-lit specular highlights from the count.
-    if (skinPixelRatio < 0.50) {
+    if (skinPixelRatio < 0.35) {
       return TFLiteResult(
         label: "Invalid Photo — No Human Skin Detected",
         classId: -1,

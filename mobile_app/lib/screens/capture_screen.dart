@@ -429,23 +429,24 @@ class _CaptureScreenState extends State<CaptureScreen> with WidgetsBindingObserv
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 24),
                     FloatingActionButton(
                       backgroundColor: Colors.tealAccent,
                       onPressed: _captureRealImage,
                       child: const Icon(Icons.camera_alt, color: Colors.black, size: 30),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 24),
                     Flexible(
                       child: FittedBox(
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.tealAccent,
+                            foregroundColor: Colors.transparent,
+                            side: const BorderSide(color: Colors.transparent),
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           ),
-                          icon: const Icon(Icons.science, size: 18),
-                          onPressed: () => _simulateCapture('mel'),
-                          label: const Text("Sample MEL", style: TextStyle(fontSize: 12)),
+                          icon: const Icon(Icons.science, size: 18, color: Colors.transparent),
+                          onPressed: null,
+                          label: const Text("Sample MEL", style: TextStyle(fontSize: 12, color: Colors.transparent)),
                         ),
                       ),
                     ),

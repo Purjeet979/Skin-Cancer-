@@ -349,34 +349,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Online / Offline Status Chip
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _isOnline ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _isOnline ? Colors.greenAccent : Colors.orangeAccent),
-                ),
-                child: Row(
-                  children: [
-                    Icon(_isOnline ? Icons.wifi : Icons.wifi_off, color: _isOnline ? Colors.greenAccent : Colors.orangeAccent),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _isOnline
-                            ? "Online Mode: Direct server referral booking enabled."
-                            : "Offline Mode: Referral will be queued in local SQLite DB and synced when online.",
-                        style: TextStyle(
-                          color: _isOnline ? Colors.greenAccent : Colors.orangeAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
+
 
               // GPS Location Banner
               Container(

@@ -264,7 +264,7 @@ class _ResultScreenState extends State<ResultScreen> {
               const SizedBox(height: 24),
               const Center(
                 child: Text(
-                  "Build Version: v1.0.2",
+                  "Build Version: v1.0.3",
                   style: TextStyle(color: Colors.white30, fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),

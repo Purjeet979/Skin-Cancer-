@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/capture_screen.dart';
+import 'screens/landing_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +20,7 @@ class DermaScanApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         useMaterial3: true,
       ),
-      home: const CaptureScreen(),
+      home: const LandingScreen(),
     );
   }
 }

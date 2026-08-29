@@ -135,8 +135,8 @@ class TFLiteService {
         if (cr < minCr) minCr = cr;
         if (cr > maxCr) maxCr = cr;
         
-        // Score = redness minus darkness. This perfectly isolates blood/wounds and ignores plain shadows.
-        double score = cr - (luma * 0.5);
+        // Heatmap targets the darkest spot relative to the average skin (moles, melanomas are dark).
+        double score = avgLuma - luma;
         if (score > maxScore) {
           maxScore = score;
           spotX = x.toDouble();
@@ -229,9 +229,9 @@ class TFLiteService {
     bool isSuspicious = ['mel', 'bcc', 'akiec'].contains(label.toLowerCase());
     String riskLevel = isSuspicious ? (label.toLowerCase() == 'mel' ? 'HIGH' : 'MEDIUM') : 'LOW';
     
-    // HEURISTIC OVERRIDE: Blood/ulcerated wounds are extremely red and have huge color variance.
-    // Normal skin has very low variance (crRange < 18).
-    if (crRange > 32.0 && maxCr > 158.0) {
+    // HEURISTIC OVERRIDE (Option B): Scoped-down safety net for actual open bleeding wounds.
+    // Requires an extreme spike of deep red against normal skin (Cr > 175). Ignores warm lighting/normal moles.
+    if (crRange > 45.0 && maxCr > 175.0) {
         fullLabel = "Severe Inflammation / Ulcerated Lesion Detected";
         riskLevel = "HIGH";
         isSuspicious = true;

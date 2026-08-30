@@ -12,6 +12,7 @@ class TFLiteResult {
   final String riskLevel;
   final bool referralRecommended;
   final bool hasLesion;
+  final double rednessScore;
 
   TFLiteResult({
     required this.label,
@@ -20,6 +21,7 @@ class TFLiteResult {
     required this.riskLevel,
     required this.referralRecommended,
     required this.hasLesion,
+    required this.rednessScore,
   });
 }
 
@@ -55,6 +57,7 @@ class TFLiteService {
 
     // 1. Human Skin Color & Texture Verification (Filters out non-skin photos like laptops, rooms, objects)
     int skinPixelCount = 0;
+    int redPixelCount = 0;
     int totalSampledPixels = 0;
     const int step = 8;
 
@@ -82,9 +85,31 @@ class TFLiteService {
         if (isRgbSkin && isYCbCrSkin && isGoodLuma) {
           skinPixelCount++;
         }
+        
+        // --- Redness Score Calculation (HSV Approximation) ---
+        double cmax = math.max(r, math.max(g, b)).toDouble();
+        double cmin = math.min(r, math.min(g, b)).toDouble();
+        double delta = cmax - cmin;
+        double h = 0;
+        if (delta > 0) {
+            if (cmax == r.toDouble()) {
+                h = 60 * (((g - b) / delta) % 6);
+            } else if (cmax == g.toDouble()) {
+                h = 60 * (((b - r) / delta) + 2);
+            } else {
+                h = 60 * (((r - g) / delta) + 4);
+            }
+        }
+        if (h < 0) h += 360;
+        double s = cmax == 0 ? 0 : delta / cmax;
+
+        if ((h < 20 || h > 340) && s > 0.4 && cmax > 100) {
+            redPixelCount++;
+        }
       }
     }
 
+    double rednessScore = redPixelCount / totalSampledPixels;
     double skinPixelRatio = skinPixelCount / totalSampledPixels;
     print("Skin Verification: Skin pixel ratio = ${(skinPixelRatio * 100).toStringAsFixed(1)}%");
 
@@ -98,6 +123,7 @@ class TFLiteService {
         riskLevel: "INVALID",
         referralRecommended: false,
         hasLesion: false,
+        rednessScore: rednessScore,
       );
     }
 
@@ -176,6 +202,7 @@ class TFLiteService {
       riskLevel: riskLevel,
       referralRecommended: referralRecommended,
       hasLesion: true,
+      rednessScore: rednessScore,
     );
   }
 

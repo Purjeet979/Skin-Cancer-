@@ -27,6 +27,12 @@ class _ResultScreenState extends State<ResultScreen> {
     _checkNetwork();
   }
 
+  String _getRednessLevel(double score) {
+    if (score > 0.10) return "High (Possible bleeding/wound)";
+    if (score > 0.02) return "Moderate";
+    return "Low";
+  }
+
   Future<void> _checkNetwork() async {
     final List<ConnectivityResult> connectivityResult = await (Connectivity().checkConnectivity());
     if (mounted) {
@@ -217,6 +223,18 @@ class _ResultScreenState extends State<ResultScreen> {
                                 : "✅ Low Risk / Normal: Routine monitoring recommended. Consult a physician if changes occur."),
                         style: const TextStyle(color: Colors.white70, fontSize: 14),
                       ),
+                      const SizedBox(height: 12),
+                      if (widget.result.riskLevel != 'INVALID')
+                        Row(
+                          children: [
+                            const Icon(Icons.water_drop, color: Colors.redAccent, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Surface Redness: ${_getRednessLevel(widget.result.rednessScore)}",
+                              style: const TextStyle(color: Colors.white70, fontSize: 14),
+                            ),
+                          ],
+                        ),
                       const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(12),

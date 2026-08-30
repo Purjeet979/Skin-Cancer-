@@ -89,6 +89,10 @@ Skin_Cancer/
 
 **Dataset:** HAM10000 (ISIC 2018 Task 3) — 7 lesion classes: `mel`, `nv`, `bcc`, `akiec`, `bkl`, `df`, `vasc`
 
+> **Note on Model Weights:** The massive raw dataset and the compiled `best.pt` weights (produced after 3.5 hours of training) are excluded from version control to keep the repository lightweight. 
+> - **Download Weights:** You can download the pre-trained `best.pt` weights directly from the [GitHub Releases](#) (Add your release link here).
+> - **Reproduce Training:** Alternatively, run `python scripts/prepare_hf_dataset.py` followed by `python model-training/train_real.py`.
+
 | Metric | Value |
 |--------|-------|
 | Test Accuracy | **78.43%** |

@@ -16,7 +16,12 @@
 
 ## Benchmark Metrics
 
-| Model Metric | Value |
+> [!WARNING]
+> **Important Context regarding the M1 Baseline (84.13%)**: The original training run in M1 was inadvertently performed on a procedurally generated synthetic dataset (MS Paint-style brown/red circles on a grey background), rather than the real HAM10000 dataset. While the training logs did genuinely reach **84.13% Top-1 Accuracy**, this metric measured the model's ability to distinguish synthetic colored circles, meaning it had zero real-world validity. 
+> 
+> *A subsequent attempt to train on the authentic HAM10000 dataset was aborted due to CPU compute limits (estimated >3 hours). For the live demo, the mobile app serves as a frontend UI shell while real Grad-CAM inference is demonstrated on the desktop backend.*
+
+| Model Metric | Value (Synthetic M1 Baseline) |
 | --- | --- |
 | **Top-1 Accuracy** | **84.13%** (0.841) |
 | **Top-5 Accuracy** | **99.80%** (0.998) |

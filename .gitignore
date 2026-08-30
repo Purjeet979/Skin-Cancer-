@@ -1,44 +1,26 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
+*.pyc
 .venv/
+venv/
 
-# Large Model Weights (>100MB)
+# Model weights & large artifacts
 *.pt
+*.tflite
+!mobile_app/assets/model/*.tflite
+*.onnx
+*.h5
+dataset/
+result_real/
+models/
 
-# Task tracking files
-[tT][aA][sS][kK]*.md
-
-# Flutter / Dart
-mobile_app/.dart_tool/
-mobile_app/.flutter-plugins
-mobile_app/.flutter-plugins-dependencies
-mobile_app/.pub-cache/
-mobile_app/.pub/
+# Flutter/Dart (targeting the mobile_app directory)
 mobile_app/build/
-mobile_app/android/.gradle/
-mobile_app/android/app/build/
-mobile_app/android/local.properties
+mobile_app/.dart_tool/
+mobile_app/.flutter-plugins-dependencies
+*.apk
 
-# Database & Logs
+# Misc
 *.db
-*.log
-test_offline_referrals.db
-
-# IDE & OS
-.vscode/
-.idea/
+temp_*.txt
 .DS_Store
-Thumbs.db
-*.swp
-.gemini/
-
-# Large Datasets / Temp uploads
-backend/uploads/*
-!backend/uploads/.gitkeep

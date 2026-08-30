@@ -81,10 +81,6 @@ However, when presented with **standard smartphone camera photos**, the model de
 - **Oversample minority classes** (HAM10000 is 67% NV) to reduce majority-class bias
 - **Apply domain adaptation techniques** (style transfer, CycleGAN) to synthetically transform dermatoscope images into smartphone-like images
 
-### Our Demo Strategy
-
-For the live demo, we use **gallery-uploaded dermatoscope-style images** (from the [`demo_images/`](demo_images/) folder) to showcase the classifier's real accuracy, while the **live camera** demonstrates the supplementary redness/wound detection feature — which works on any image since it uses deterministic HSV thresholds, not the ML model.
-
 ---
 
 ## 📂 Repository Structure

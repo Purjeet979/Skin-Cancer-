@@ -44,7 +44,7 @@
 |---|---------|-------------|
 | 1 | **On-Device TFLite Inference** | Quantized **1.43 MB INT8 TFLite model** (`assets/model/best_int8.tflite`) bundled inside the app. 100% local classification in **under 35 ms/scan** — zero server latency, zero network transmission. |
 | 2 | **7-Class Skin Lesion Classification** | Classifies into 7 HAM10000 categories: Melanoma (MEL), Basal Cell Carcinoma (BCC), Actinic Keratosis (AKIEC), Benign Keratosis (BKL), Dermatofibroma (DF), Melanocytic Nevus (NV), and Vascular Lesion (VASC). |
-| 3 | **Grad-CAM Explainability** | Visual heatmap overlay highlighting the feature regions the network evaluated during lesion analysis — shows *why* the AI made its decision. |
+| 3 | **Grad-CAM Explainability (Desktop Only)** | Visual heatmap overlay showing *why* the AI made its decision. Runs as a **desktop Python script** (`model-training/gradcam.py`) — not available in the mobile app because TFLite's INT8 runtime does not support the gradient computation required for Grad-CAM. |
 | 4 | **Surface Redness / Wound Detection** | Supplementary HSV-based Computer Vision heuristic that detects anomalous surface redness (bleeding, inflammation) independently of the ML model. Works on any image — including live smartphone photos. |
 | 5 | **Offline Referral Queueing & Auto-Sync** | Local SQLite DB (`sqflite`) queues high-risk referrals when offline (`QUEUED_OFFLINE`) and auto-syncs to `/referral` once connectivity returns (`SYNCED`). |
 | 6 | **Bilingual Voice Guidance (Hindi & English)** | `flutter_tts`-powered real-time audio instructions (e.g. *"कृपया त्वचा के घाव को कैमरे के केंद्र में रखें"*) with instant language toggle. |

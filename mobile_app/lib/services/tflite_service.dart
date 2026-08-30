@@ -93,7 +93,7 @@ class TFLiteService {
         double h = 0;
         if (delta > 0) {
             if (cmax == r.toDouble()) {
-                h = 60 * (((g - b) / delta) % 6);
+                h = 60 * ((((g - b) / delta) % 6) + 6) % 6;  // safe mod for negative values
             } else if (cmax == g.toDouble()) {
                 h = 60 * (((b - r) / delta) + 2);
             } else {
@@ -103,13 +103,15 @@ class TFLiteService {
         if (h < 0) h += 360;
         double s = cmax == 0 ? 0 : delta / cmax;
 
-        if ((h < 20 || h > 340) && s > 0.4 && cmax > 100) {
+        // ponytail: Tight thresholds — h<10 or h>350 with high sat (>0.6) to avoid catching warm skin tones.
+        // Normal skin sits h=10-30, s=0.3-0.5 range; only saturated crimson/blood should trigger.
+        if ((h < 10 || h > 350) && s > 0.6 && cmax > 100) {
             redPixelCount++;
         }
       }
     }
 
-    double rednessScore = redPixelCount / totalSampledPixels;
+    double rednessScore = totalSampledPixels > 0 ? redPixelCount / totalSampledPixels.toDouble() : 0.0;
     double skinPixelRatio = skinPixelCount / totalSampledPixels;
     print("Skin Verification: Skin pixel ratio = ${(skinPixelRatio * 100).toStringAsFixed(1)}%");
 
